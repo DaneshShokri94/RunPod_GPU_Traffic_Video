@@ -38,9 +38,7 @@ export function ProgressPanel({ status, progress, statusMsg, error, currentFrame
         />
       </div>
 
-      {statusMsg && (
-        <p style={{ color: 'var(--text2)', fontSize: 13 }}>{statusMsg}</p>
-      )}
+      {statusMsg && <p style={{ color: 'var(--text2)', fontSize: 13 }}>{statusMsg}</p>}
 
       {error && (
         <div style={{
@@ -53,30 +51,20 @@ export function ProgressPanel({ status, progress, statusMsg, error, currentFrame
       )}
 
       {currentFrame && (
-        <div style={{
-          marginTop: 12, display: 'flex', gap: 20,
-          fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text3)',
-        }}>
-          <span>Frame {currentFrame.frame} / {currentFrame.total}</span>
-          <span>{currentFrame.detections?.length ?? 0} vehicles in frame</span>
+        <div style={{ marginTop: 12, fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text3)' }}>
+          Frame {currentFrame.frame} / {currentFrame.total} · {currentFrame.detections?.length ?? 0} vehicles in frame
         </div>
       )}
 
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
     </div>
   )
 }
 
 // ─── ROICountsPanel ───────────────────────────────────────────────────────────
 const ROI_COLORS = ['#FF4444','#44AAFF','#44FF44','#FFAA00','#FF44FF','#00DDDD','#FF8844','#8844FF']
-const CLASS_COLORS = { Car: '#44AAFF', Motorcycle: '#FF44FF', Bus: '#FFAA00', Truck: '#44FF44' }
 
-export function ROICountsPanel({ roiCounts, lineCounts, rois }) {
+export function ROICountsPanel({ roiCounts }) {
   return (
     <div className="card">
       <h3 style={{ fontFamily: 'var(--mono)', fontSize: 14, marginBottom: 16, color: 'var(--text2)' }}>
@@ -100,49 +88,28 @@ export function ROICountsPanel({ roiCounts, lineCounts, rois }) {
               }}>
                 {count}
               </div>
-              <div style={{ color: 'var(--text3)', fontSize: 12, marginTop: 4 }}>vehicles detected</div>
             </div>
           ))}
         </div>
-      )}
-
-      {Object.entries(lineCounts).length > 0 && (
-        <>
-          <h3 style={{ fontFamily: 'var(--mono)', fontSize: 14, margin: '24px 0 12px', color: 'var(--text2)' }}>
-            Line Crossings
-          </h3>
-          {Object.entries(lineCounts).map(([name, data]) => (
-            <div key={name} style={{
-              padding: '14px 16px', marginBottom: 8,
-              background: 'var(--bg3)', borderRadius: 'var(--radius)',
-              borderLeft: '4px solid #FFD700',
-            }}>
-              <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 8, fontWeight: 500 }}>{name}</div>
-              <div style={{ display: 'flex', gap: 24, fontFamily: 'var(--mono)', fontSize: 14 }}>
-                <span style={{ color: 'var(--accent)' }}>Forward: {data.total_fwd ?? 0}</span>
-                <span style={{ color: 'var(--accent2)' }}>Backward: {data.total_bwd ?? 0}</span>
-              </div>
-            </div>
-          ))}
-        </>
       )}
     </div>
   )
 }
 
 // ─── SummaryPanel ─────────────────────────────────────────────────────────────
-const TURN_COLORS = {
-  'Straight':   '#44FF44',
-  'Left Turn':  '#FF4444',
-  'Right Turn': '#44AAFF',
-  'U-Turn':     '#FF44FF',
-  'Unknown':    '#888888',
-}
+const CLASS_COLORS = { Car: '#44AAFF', Motorcycle: '#FF44FF', Bus: '#FFAA00', Truck: '#44FF44' }
 
 export function SummaryPanel({ summary }) {
   const totalVehicles = summary.total_vehicles || 0
-  const turning = summary.turning_movements || {}
   const roiTotals = summary.roi_totals || {}
+
+  // Aggregate all class counts across all ROIs
+  const totalByClass = {}
+  Object.values(roiTotals).forEach(data => {
+    Object.entries(data.counts || {}).forEach(([cls, count]) => {
+      totalByClass[cls] = (totalByClass[cls] || 0) + count
+    })
+  })
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -150,47 +117,66 @@ export function SummaryPanel({ summary }) {
         Final Report
       </h3>
 
-      {/* top stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {/* total + duration */}
         <div className="card">
           <div style={{ color: 'var(--text2)', fontSize: 12, fontFamily: 'var(--mono)', marginBottom: 8 }}>TOTAL VEHICLES</div>
-          <div style={{ fontSize: 36, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--accent)' }}>
+          <div style={{ fontSize: 48, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--accent)' }}>
             {totalVehicles}
           </div>
-          <div style={{ color: 'var(--text3)', fontSize: 12, marginTop: 4 }}>
+          <div style={{ color: 'var(--text3)', fontSize: 12, marginTop: 8 }}>
             {summary.duration_sec}s analysed · {summary.total_frames} frames
           </div>
         </div>
 
+        {/* classification breakdown */}
         <div className="card">
-          <div style={{ color: 'var(--text2)', fontSize: 12, fontFamily: 'var(--mono)', marginBottom: 12 }}>TURNING MOVEMENTS</div>
-          {Object.entries(turning).length > 0 ? Object.entries(turning).map(([type, count]) => (
-            <div key={type} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
-              <span style={{ color: TURN_COLORS[type] || 'var(--text)' }}>{type}</span>
-              <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)' }}>
-                {count} ({totalVehicles > 0 ? Math.round(count / totalVehicles * 100) : 0}%)
-              </span>
-            </div>
-          )) : (
-            <p style={{ color: 'var(--text3)', fontSize: 13 }}>No data</p>
+          <div style={{ color: 'var(--text2)', fontSize: 12, fontFamily: 'var(--mono)', marginBottom: 16 }}>CLASSIFICATION</div>
+          {Object.entries(totalByClass).length > 0 ? (
+            Object.entries(totalByClass).map(([cls, count]) => (
+              <div key={cls} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: 10, padding: '8px 12px',
+                background: 'var(--bg3)', borderRadius: 'var(--radius)',
+                borderLeft: `3px solid ${CLASS_COLORS[cls] || '#888'}`,
+              }}>
+                <span style={{ color: CLASS_COLORS[cls] || 'var(--text)', fontSize: 14 }}>{cls}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{count}</span>
+              </div>
+            ))
+          ) : (
+            <p style={{ color: 'var(--text3)', fontSize: 13 }}>No classification data</p>
           )}
         </div>
+      </div>
 
-        <div className="card">
-          <div style={{ color: 'var(--text2)', fontSize: 12, fontFamily: 'var(--mono)', marginBottom: 12 }}>CLASSIFICATION</div>
-          {Object.entries(roiTotals).map(([name, data]) => (
-            <div key={name} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 4 }}>{name}</div>
-              {Object.entries(data.counts || {}).map(([cls, count]) => (
-                <div key={cls} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 13 }}>
-                  <span style={{ color: CLASS_COLORS[cls] || 'var(--text)' }}>{cls}</span>
-                  <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)' }}>{count}</span>
+      {/* per-zone breakdown */}
+      {Object.entries(roiTotals).length > 1 && (
+        <div style={{ marginTop: 14 }}>
+          <div className="card">
+            <div style={{ color: 'var(--text2)', fontSize: 12, fontFamily: 'var(--mono)', marginBottom: 16 }}>PER-ZONE BREAKDOWN</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+              {Object.entries(roiTotals).map(([name, data], i) => (
+                <div key={name} style={{
+                  padding: '12px', background: 'var(--bg3)', borderRadius: 'var(--radius)',
+                  borderLeft: `3px solid ${ROI_COLORS[i % ROI_COLORS.length]}`,
+                }}>
+                  <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 6 }}>{name}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: ROI_COLORS[i % ROI_COLORS.length], marginBottom: 6 }}>
+                    {data.total || 0}
+                  </div>
+                  {Object.entries(data.counts || {}).map(([cls, count]) => (
+                    <div key={cls} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)' }}>
+                      <span>{cls}</span>
+                      <span>{count}</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
