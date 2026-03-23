@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL || ''
-const CHUNK_SIZE = 90 * 1024 * 1024 // 90MB per chunk (under 100MB Worker limit)
+const CHUNK_SIZE = 90 * 1024 * 1024 // 90MB per chunk
 
 export default function UploadStep({ onUploaded }) {
   const [dragging, setDragging] = useState(false)
@@ -13,8 +13,7 @@ export default function UploadStep({ onUploaded }) {
 
   const handleFile = (f) => {
     if (!f) return
-    const ok = ['video/mp4', 'video/avi', 'video/quicktime', 'video/x-msvideo', 'video/webm']
-    if (!ok.includes(f.type) && !f.name.match(/\.(mp4|avi|mov|webm|mkv)$/i)) {
+    if (!f.type.startsWith('video/') && !f.name.match(/\.(mp4|avi|mov|webm|mkv)$/i)) {
       setError('Please upload a video file (MP4, AVI, MOV, WebM)')
       return
     }
@@ -35,7 +34,7 @@ export default function UploadStep({ onUploaded }) {
     setError(null)
 
     try {
-      // 1. init multipart upload
+      // 1. init upload
       const res = await fetch(`${WORKER_URL}/api/upload-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -47,37 +46,52 @@ export default function UploadStep({ onUploaded }) {
       }
       const { jobId, videoKey, uploadId, videoUrl } = await res.json()
 
-      // 2. upload in chunks
-      const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
-      const parts = []
+      if (file.size <= CHUNK_SIZE) {
+        // Small file: simple PUT upload
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+          xhr.open('PUT', `${WORKER_URL}/api/upload/${videoKey}`)
+          xhr.setRequestHeader('Content-Type', file.type || 'video/mp4')
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) setProgress(Math.round(e.loaded / e.total * 80))
+          }
+          xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`))
+          xhr.onerror = () => reject(new Error('Network error'))
+          xhr.send(file)
+        })
+      } else {
+        // Large file: multipart chunked upload
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+        const parts = []
 
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE
-        const end = Math.min(start + CHUNK_SIZE, file.size)
-        const chunk = file.slice(start, end)
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE
+          const end = Math.min(start + CHUNK_SIZE, file.size)
+          const chunk = file.slice(start, end)
 
-        const partRes = await fetch(
-          `${WORKER_URL}/api/upload-part?key=${encodeURIComponent(videoKey)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${i + 1}`,
-          { method: 'PUT', body: chunk }
-        )
-        if (!partRes.ok) throw new Error(`Chunk ${i + 1}/${totalChunks} failed`)
-        const partData = await partRes.json()
-        parts.push({ partNumber: partData.partNumber, etag: partData.etag })
+          const partRes = await fetch(
+            `${WORKER_URL}/api/upload-part?key=${encodeURIComponent(videoKey)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${i + 1}`,
+            { method: 'PUT', body: chunk }
+          )
+          if (!partRes.ok) throw new Error(`Chunk ${i + 1}/${totalChunks} failed`)
+          const partData = await partRes.json()
+          parts.push({ partNumber: partData.partNumber, etag: partData.etag })
 
-        setProgress(Math.round(((i + 1) / totalChunks) * 80))
+          setProgress(Math.round(((i + 1) / totalChunks) * 80))
+        }
+
+        // Complete multipart
+        const completeRes = await fetch(`${WORKER_URL}/api/upload-complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId, videoKey, uploadId, parts }),
+        })
+        if (!completeRes.ok) throw new Error('Failed to complete upload')
       }
-
-      // 3. complete multipart upload
-      const completeRes = await fetch(`${WORKER_URL}/api/upload-complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, videoKey, uploadId, parts }),
-      })
-      if (!completeRes.ok) throw new Error('Failed to complete upload')
 
       setProgress(85)
 
-      // 4. extract first frame locally
+      // Extract first frame locally
       const frame = await extractFirstFrame(file)
 
       setProgress(100)
@@ -121,9 +135,7 @@ export default function UploadStep({ onUploaded }) {
           <div>
             <div style={{ fontSize: 40, marginBottom: 12 }}>🎬</div>
             <div style={{ color: 'var(--text)', fontWeight: 500, marginBottom: 4 }}>{file.name}</div>
-            <div style={{ color: 'var(--text2)', fontSize: 13 }}>
-              {(file.size / 1024 / 1024).toFixed(1)} MB
-            </div>
+            <div style={{ color: 'var(--text2)', fontSize: 13 }}>{(file.size / 1024 / 1024).toFixed(1)} MB</div>
           </div>
         ) : (
           <div>
