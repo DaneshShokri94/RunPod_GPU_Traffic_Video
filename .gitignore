@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+__pycache__/
+*.pyc
+.wrangler/
+*.egg-info/
+.DS_Store
+*.mp4
+*.avi
+*.mov
+venv/
+.venv/

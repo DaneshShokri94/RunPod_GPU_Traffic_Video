@@ -1,0 +1,27 @@
+name = "traffic-monitor-worker"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "ANALYSIS_ROOM"
+class_name = "AnalysisRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["AnalysisRoom"]
+
+# R2 bucket for video storage
+[[r2_buckets]]
+binding = "VIDEO_BUCKET"
+bucket_name = "traffic-videos"
+
+# KV for caching latest job results
+[[kv_namespaces]]
+binding = "RESULTS_KV"
+id = "REPLACE_WITH_YOUR_KV_ID"
+
+# Environment variables
+[vars]
+GPU_SERVER_URL = "ws://YOUR_RUNPOD_IP:8765"
+MAX_VIDEO_SIZE_MB = "500"

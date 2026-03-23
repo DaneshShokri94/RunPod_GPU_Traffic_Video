@@ -1,0 +1,110 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0c0f;
+  --bg2:       #111418;
+  --bg3:       #181c22;
+  --border:    #232830;
+  --border2:   #2e3540;
+  --text:      #e2e8f0;
+  --text2:     #8896aa;
+  --text3:     #4a5568;
+  --accent:    #00e5a0;
+  --accent2:   #0097ff;
+  --warn:      #ff8c00;
+  --danger:    #ff3b3b;
+  --critical:  #ff1744;
+  --high:      #ff6d00;
+  --moderate:  #ffd600;
+  --low:       #00e676;
+  --mono:      'Space Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+  --radius:    8px;
+  --radius-lg: 14px;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* utilities */
+.mono { font-family: var(--mono); }
+.text2 { color: var(--text2); }
+.text3 { color: var(--text3); }
+
+/* buttons */
+button {
+  font-family: var(--sans);
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 18px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+button:hover { opacity: 0.85; }
+button:active { transform: scale(0.97); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+.btn-secondary {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border2);
+}
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* cards */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+/* progress bar */
+.progress-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+/* severity badges */
+.badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.badge-CRITICAL { background: #ff17441a; color: var(--critical); border: 1px solid var(--critical); }
+.badge-HIGH     { background: #ff6d001a; color: var(--high);     border: 1px solid var(--high); }
+.badge-MODERATE { background: #ffd6001a; color: var(--moderate); border: 1px solid var(--moderate); }
+.badge-LOW      { background: #00e6761a; color: var(--low);      border: 1px solid var(--low); }
