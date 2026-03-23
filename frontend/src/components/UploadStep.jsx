@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL || ''
+const CHUNK_SIZE = 90 * 1024 * 1024 // 90MB per chunk (under 100MB Worker limit)
 
 export default function UploadStep({ onUploaded }) {
   const [dragging, setDragging] = useState(false)
@@ -34,33 +35,49 @@ export default function UploadStep({ onUploaded }) {
     setError(null)
 
     try {
-      // 1. get upload URL from Worker
+      // 1. init multipart upload
       const res = await fetch(`${WORKER_URL}/api/upload-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: file.name, size: file.size }),
       })
       if (!res.ok) {
-        const e = await res.json()
-        throw new Error(e.error || 'Failed to get upload URL')
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to init upload')
       }
-      const { jobId, videoKey, videoUrl } = await res.json()
+      const { jobId, videoKey, uploadId, videoUrl } = await res.json()
 
-      // 2. upload directly to R2 via PUT (track progress with XMLHttpRequest)
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open('PUT', `${WORKER_URL}/api/upload/${videoKey}`)
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.round(e.loaded / e.total * 80))
-        }
-        xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`))
-        xhr.onerror = () => reject(new Error('Network error during upload'))
-        xhr.send(file)
+      // 2. upload in chunks
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+      const parts = []
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE
+        const end = Math.min(start + CHUNK_SIZE, file.size)
+        const chunk = file.slice(start, end)
+
+        const partRes = await fetch(
+          `${WORKER_URL}/api/upload-part?key=${encodeURIComponent(videoKey)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${i + 1}`,
+          { method: 'PUT', body: chunk }
+        )
+        if (!partRes.ok) throw new Error(`Chunk ${i + 1}/${totalChunks} failed`)
+        const partData = await partRes.json()
+        parts.push({ partNumber: partData.partNumber, etag: partData.etag })
+
+        setProgress(Math.round(((i + 1) / totalChunks) * 80))
+      }
+
+      // 3. complete multipart upload
+      const completeRes = await fetch(`${WORKER_URL}/api/upload-complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, videoKey, uploadId, parts }),
       })
+      if (!completeRes.ok) throw new Error('Failed to complete upload')
 
       setProgress(85)
 
-      // 3. extract first frame locally in the browser
+      // 4. extract first frame locally
       const frame = await extractFirstFrame(file)
 
       setProgress(100)
@@ -79,10 +96,9 @@ export default function UploadStep({ onUploaded }) {
         Upload Video
       </h1>
       <p style={{ color: 'var(--text2)', marginBottom: 32 }}>
-        Upload a traffic video to begin analysis. Supports MP4, AVI, MOV, WebM.
+        Upload a traffic video to begin analysis. Supports MP4, AVI, MOV, WebM up to 500MB.
       </p>
 
-      {/* drop zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
@@ -98,13 +114,8 @@ export default function UploadStep({ onUploaded }) {
           transition: 'all 0.2s',
         }}
       >
-        <input
-          ref={inputRef}
-          type="file"
-          accept="video/*"
-          style={{ display: 'none' }}
-          onChange={(e) => handleFile(e.target.files[0])}
-        />
+        <input ref={inputRef} type="file" accept="video/*" style={{ display: 'none' }}
+          onChange={(e) => handleFile(e.target.files[0])} />
 
         {file ? (
           <div>
@@ -117,26 +128,19 @@ export default function UploadStep({ onUploaded }) {
         ) : (
           <div>
             <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }}>⬆</div>
-            <div style={{ color: 'var(--text)', marginBottom: 8 }}>
-              Drop video here or click to browse
-            </div>
-            <div style={{ color: 'var(--text3)', fontSize: 13 }}>
-              MP4, AVI, MOV, WebM · Max 500MB
-            </div>
+            <div style={{ color: 'var(--text)', marginBottom: 8 }}>Drop video here or click to browse</div>
+            <div style={{ color: 'var(--text3)', fontSize: 13 }}>MP4, AVI, MOV, WebM · Max 500MB</div>
           </div>
         )}
       </div>
 
-      {/* progress */}
       {uploading && (
         <div style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ color: 'var(--text2)', fontSize: 13 }}>
-              {progress < 85 ? 'Uploading...' : 'Extracting first frame...'}
+              {progress < 80 ? 'Uploading...' : progress < 100 ? 'Extracting first frame...' : 'Done!'}
             </span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--accent)' }}>
-              {progress}%
-            </span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--accent)' }}>{progress}%</span>
           </div>
           <div className="progress-track">
             <div className="progress-bar" style={{ width: `${progress}%` }} />
@@ -144,7 +148,6 @@ export default function UploadStep({ onUploaded }) {
         </div>
       )}
 
-      {/* error */}
       {error && (
         <div style={{
           marginTop: 16, padding: '12px 16px',
@@ -155,13 +158,9 @@ export default function UploadStep({ onUploaded }) {
         </div>
       )}
 
-      {/* upload button */}
       {file && !uploading && (
-        <button
-          className="btn-primary"
-          onClick={handleUpload}
-          style={{ marginTop: 20, width: '100%', padding: '12px' }}
-        >
+        <button className="btn-primary" onClick={handleUpload}
+          style={{ marginTop: 20, width: '100%', padding: '12px' }}>
           Upload & continue →
         </button>
       )}
@@ -169,35 +168,25 @@ export default function UploadStep({ onUploaded }) {
   )
 }
 
-// Extract first frame from video locally using a <video> element + canvas
 function extractFirstFrame(file) {
   return new Promise((resolve) => {
     const video = document.createElement('video')
     video.muted = true
     video.preload = 'auto'
-
-    video.onloadeddata = () => {
-      // seek to 0.1s to avoid potential black first frame
-      video.currentTime = 0.1
-    }
-
+    video.onloadeddata = () => { video.currentTime = 0.1 }
     video.onseeked = () => {
       const canvas = document.createElement('canvas')
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(video, 0, 0)
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-      const base64 = dataUrl.split(',')[1]
+      canvas.getContext('2d').drawImage(video, 0, 0)
+      const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1]
       URL.revokeObjectURL(video.src)
       resolve({ data: base64, width: video.videoWidth, height: video.videoHeight })
     }
-
     video.onerror = () => {
       URL.revokeObjectURL(video.src)
       resolve({ data: null, width: 1280, height: 720 })
     }
-
     video.src = URL.createObjectURL(file)
   })
 }

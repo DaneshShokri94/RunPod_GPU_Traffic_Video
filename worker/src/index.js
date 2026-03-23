@@ -62,6 +62,16 @@ export default {
         }, { headers: cors })
       }
 
+      // ── PUT /api/upload-part — upload a single chunk of multipart upload ────
+      if (path === '/api/upload-part' && request.method === 'PUT') {
+        const videoKey = url.searchParams.get('key')
+        const uploadId = url.searchParams.get('uploadId')
+        const partNumber = parseInt(url.searchParams.get('partNumber'))
+        const mpu = env.VIDEO_BUCKET.resumeMultipartUpload(videoKey, uploadId)
+        const part = await mpu.uploadPart(partNumber, request.body)
+        return Response.json({ partNumber, etag: part.etag }, { headers: cors })
+      }
+
       // ── GET /api/upload/:key — serve video from R2 ─────────────────────────
       if (request.method === 'GET' && path.startsWith('/api/upload/')) {
         const key = path.replace('/api/upload/', '')
