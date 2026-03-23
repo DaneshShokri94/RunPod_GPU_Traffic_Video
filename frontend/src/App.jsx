@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import UploadStep from './components/UploadStep.jsx'
 import ROIDrawer from './components/ROIDrawer.jsx'
 import AnalysisView from './components/AnalysisView.jsx'
@@ -91,14 +92,19 @@ export default function App() {
         {step === 0 && (
           <UploadStep onUploaded={handleUploaded} />
         )}
-        {step === 1 && firstFrame && (
-          <ROIDrawer
-            backgroundFrame={firstFrame}
-            frameWidth={frameSize.w}
-            frameHeight={frameSize.h}
-            onDone={handleROIsDone}
-            onBack={() => setStep(0)}
-          />
+        {step === 1 && (
+          <>
+            {console.log('Rendering ROIDrawer', { firstFrame: !!firstFrame, frameSize })}
+            <ErrorBoundary>
+              <ROIDrawer
+                backgroundFrame={firstFrame}
+                frameWidth={frameSize.w}
+                frameHeight={frameSize.h}
+                onDone={handleROIsDone}
+                onBack={() => setStep(0)}
+              />
+            </ErrorBoundary>
+          </>
         )}
         {step === 2 && job && (
           <AnalysisView
