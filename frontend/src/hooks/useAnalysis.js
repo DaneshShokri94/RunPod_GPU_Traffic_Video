@@ -23,70 +23,48 @@ export default function useAnalysis(job, rois, lines) {
     setSummary(null)
 
     try {
-      // 1. POST to Worker to kick off GPU job
-      const res = await fetch(`${WORKER_URL}/api/job/${job.jobId}/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // connect directly to GPU server WebSocket
+      const ws = new WebSocket('ws://213.173.107.138:29855')
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        setStatus('running')
+        ws.send(JSON.stringify({
+          type: 'job',
           video_url: job.videoUrl,
           rois,
           lines,
           every_n_frames: 3,
-        }),
-      })
-      if (!res.ok) throw new Error('Failed to start job')
-
-      // 2. Open WebSocket to receive streaming results
-      const wsUrl = `${WORKER_URL.replace(/^http/, 'ws')}/api/job/${job.jobId}/connect`
-      const ws = new WebSocket(wsUrl)
-      wsRef.current = ws
-
-      ws.onopen = () => setStatus('running')
+        }))
+      }
 
       ws.onmessage = (e) => {
         const data = JSON.parse(e.data)
-
-        switch (data.type) {
-          case 'status':
-            setStatusMsg(data.msg)
-            break
-
-          case 'video_info':
-            setStatusMsg(`Video: ${data.width}×${data.height} @ ${data.fps?.toFixed(1)}fps`)
-            break
-
-          case 'frame_result':
-            setProgress(data.percent || 0)
-            setCurrentFrame(data)
-            if (data.roi_counts)  setRoiCounts(data.roi_counts)
-            if (data.line_counts) setLineCounts(data.line_counts)
-            if (data.near_miss?.length > 0) {
-              setNearMissEvents(prev => [...prev, ...data.near_miss])
-            }
-            break
-
-          case 'done':
-            setProgress(100)
-            setSummary(data)
-            setStatus('done')
-            ws.close()
-            break
-
-          case 'error':
-            setError(data.msg)
-            setStatus('error')
-            ws.close()
-            break
+        if (data.type === 'status') setStatusMsg(data.msg)
+        if (data.type === 'frame_result') {
+          setProgress(data.percent || 0)
+          setCurrentFrame(data)
+          if (data.roi_counts) setRoiCounts(data.roi_counts)
+          if (data.line_counts) setLineCounts(data.line_counts)
+          if (data.near_miss?.length > 0)
+            setNearMissEvents(prev => [...prev, ...data.near_miss])
+        }
+        if (data.type === 'done') {
+          setProgress(100)
+          setSummary(data)
+          setStatus('done')
+          ws.close()
+        }
+        if (data.type === 'error') {
+          setError(data.msg)
+          setStatus('error')
+          ws.close()
         }
       }
 
       ws.onerror = () => {
-        setError('WebSocket connection error. Check your GPU server is running.')
+        setError('Cannot connect to GPU server. Make sure RunPod is running.')
         setStatus('error')
-      }
-
-      ws.onclose = () => {
-        if (status !== 'done') setStatus(s => s === 'running' ? 'error' : s)
       }
 
     } catch (e) {
