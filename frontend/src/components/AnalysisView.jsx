@@ -1,25 +1,18 @@
 import { useEffect } from 'react'
 import useAnalysis from '../hooks/useAnalysis.js'
-import ProgressPanel from './ProgressPanel.jsx'
-import ROICountsPanel from './ROICountsPanel.jsx'
-import NearMissPanel from './NearMissPanel.jsx'
-import SummaryPanel from './SummaryPanel.jsx'
+import { ProgressPanel, ROICountsPanel, SummaryPanel } from './Panels.jsx'
 import { exportCSV, exportHTML } from '../utils/export.js'
 
 export default function AnalysisView({ job, rois, lines, onBack }) {
   const {
     status, progress, currentFrame,
     roiCounts, lineCounts,
-    nearMissEvents, summary,
-    statusMsg, error,
+    summary, statusMsg, error,
     start, stop,
   } = useAnalysis(job, rois, lines)
 
   // auto-start when component mounts
   useEffect(() => { start() }, [])
-
-  const criticalCount = nearMissEvents.filter(e => e.severity === 'CRITICAL').length
-  const highCount     = nearMissEvents.filter(e => e.severity === 'HIGH').length
 
   return (
     <div>
@@ -42,7 +35,7 @@ export default function AnalysisView({ job, rois, lines, onBack }) {
             <>
               <button
                 className="btn-secondary"
-                onClick={() => exportCSV(roiCounts, lineCounts, nearMissEvents)}
+                onClick={() => exportCSV(roiCounts, lineCounts)}
               >
                 Export CSV
               </button>
@@ -61,21 +54,6 @@ export default function AnalysisView({ job, rois, lines, onBack }) {
         </div>
       </div>
 
-      {/* critical alert banner */}
-      {criticalCount > 0 && (
-        <div style={{
-          padding: '12px 20px', marginBottom: 20,
-          background: '#ff17441a', border: '1px solid var(--critical)',
-          borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: 12,
-        }}>
-          <span style={{ fontSize: 20 }}>⚠</span>
-          <span style={{ color: 'var(--critical)', fontWeight: 600 }}>
-            {criticalCount} CRITICAL near-miss event{criticalCount > 1 ? 's' : ''} detected
-            {highCount > 0 ? ` · ${highCount} HIGH` : ''}
-          </span>
-        </div>
-      )}
-
       {/* progress */}
       <ProgressPanel
         status={status}
@@ -85,20 +63,14 @@ export default function AnalysisView({ job, rois, lines, onBack }) {
         currentFrame={currentFrame}
       />
 
-      {/* live results grid */}
+      {/* live results */}
       {(status === 'running' || status === 'done') && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 16,
-          marginTop: 20,
-        }}>
+        <div style={{ marginTop: 20 }}>
           <ROICountsPanel
             roiCounts={roiCounts}
             lineCounts={lineCounts}
             rois={rois}
           />
-          <NearMissPanel events={nearMissEvents} />
         </div>
       )}
 
