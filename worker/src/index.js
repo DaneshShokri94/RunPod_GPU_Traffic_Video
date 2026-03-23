@@ -20,12 +20,12 @@ export default {
     // CORS headers for all responses
     const cors = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      'Access-Control-Allow-Headers': '*',
     }
 
     if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: cors })
+      return new Response(null, { status: 204, headers: cors })
     }
 
     try {
