@@ -35,9 +35,8 @@ export default {
       }
 
       // ── POST /api/upload-url ───────────────────────────────────────────────
-      // Client asks for a pre-signed URL to upload video directly to R2
       if (path === '/api/upload-url' && request.method === 'POST') {
-        const { filename, size } = await request.json()
+        const { filename, size, multipart } = await request.json()
 
         const maxMB = parseInt(env.MAX_VIDEO_SIZE_MB || '500')
         if (size > maxMB * 1024 * 1024) {
@@ -49,17 +48,15 @@ export default {
 
         const jobId = crypto.randomUUID()
         const videoKey = `videos/${jobId}/${filename}`
+        const videoUrl = `${new URL(request.url).origin}/api/upload/${videoKey}`
 
-        // Create multipart upload — client uploads directly to R2
-        const mpu = await env.VIDEO_BUCKET.createMultipartUpload(videoKey)
+        // Only create multipart upload if client requests it (large files)
+        if (multipart) {
+          const mpu = await env.VIDEO_BUCKET.createMultipartUpload(videoKey)
+          return Response.json({ jobId, videoKey, uploadId: mpu.uploadId, videoUrl }, { headers: cors })
+        }
 
-        return Response.json({
-          jobId,
-          videoKey,
-          uploadId: mpu.uploadId,
-          // Public URL the GPU server will use to download
-          videoUrl: `${new URL(request.url).origin}/api/upload/${videoKey}`,
-        }, { headers: cors })
+        return Response.json({ jobId, videoKey, videoUrl }, { headers: cors })
       }
 
       // ── PUT /api/upload-part — upload a single chunk of multipart upload ────

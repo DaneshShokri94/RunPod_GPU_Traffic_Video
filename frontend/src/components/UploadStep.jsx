@@ -38,7 +38,7 @@ export default function UploadStep({ onUploaded }) {
       const res = await fetch(`${WORKER_URL}/api/upload-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, size: file.size }),
+        body: JSON.stringify({ filename: file.name, size: file.size, multipart: file.size > CHUNK_SIZE }),
       })
       if (!res.ok) {
         const err = await res.json()
