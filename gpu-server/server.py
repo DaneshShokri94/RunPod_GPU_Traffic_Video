@@ -78,9 +78,15 @@ async def handle_client(websocket):
             'height': height,
         })
 
+        # ── reset tracker state from any previous job ────────────────────────
+        model.predictor = None  # force fresh tracker for each job
+
         # ── configure session with ROIs and lines from client ─────────────────
         session = TrafficAnalysisSession(model=model, fps=fps)
         session.configure(job)
+
+        print(f"    ROIs configured: {[r.name for r in session.rois]}")
+        print(f"    ROI points: {[r.points[:2] for r in session.rois]}")
 
         await send_json(websocket, {
             'type': 'status',
@@ -104,6 +110,11 @@ async def handle_client(websocket):
             processed += 1
             result = session.process_frame(frame)
             percent = round(frame_idx / max(total_frames, 1) * 100, 1)
+
+            # debug: log first few frames
+            if processed <= 3:
+                det_count = len(result.get('detections', []))
+                print(f"    Frame {frame_idx}: {det_count} detections, roi_counts={result.get('roi_counts', {})}")
 
             await send_json(websocket, {
                 'type': 'frame_result',
