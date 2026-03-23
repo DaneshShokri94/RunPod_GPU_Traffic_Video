@@ -59,6 +59,7 @@ async def handle_client(websocket):
         skip = job.get('every_n_frames', SKIP_FRAMES)
 
         # ── open video from URL (R2 public URL) ───────────────────────────────
+        print(f"    Video URL: {video_url}")
         await send_json(websocket, {'type': 'status', 'msg': 'Opening video...'})
         cap = cv2.VideoCapture(video_url)
         if not cap.isOpened():
