@@ -62,6 +62,22 @@ export default {
         }, { headers: cors })
       }
 
+      // ── GET /api/upload/:key — serve video from R2 ─────────────────────────
+      if (request.method === 'GET' && path.startsWith('/api/upload/')) {
+        const key = path.replace('/api/upload/', '')
+        const object = await env.VIDEO_BUCKET.get(key)
+        if (!object) {
+          return Response.json({ error: 'Not found' }, { status: 404, headers: cors })
+        }
+        return new Response(object.body, {
+          headers: {
+            ...cors,
+            'Content-Type': object.httpMetadata?.contentType || 'video/mp4',
+            'Content-Length': object.size,
+          }
+        })
+      }
+
       // ── PUT /api/upload/:key — receive video and store in R2 ──────────────
       if (request.method === 'PUT' && path.startsWith('/api/upload/')) {
         const key = path.replace('/api/upload/', '')
