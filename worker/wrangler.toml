@@ -9,7 +9,7 @@ class_name = "AnalysisRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["AnalysisRoom"]
+new_sqlite_classes = ["AnalysisRoom"]
 
 # R2 bucket for video storage
 [[r2_buckets]]
@@ -19,9 +19,9 @@ bucket_name = "traffic-videos"
 # KV for caching latest job results
 [[kv_namespaces]]
 binding = "RESULTS_KV"
-id = "REPLACE_WITH_YOUR_KV_ID"
+id = "69d310d9606041d497c5f2571770f81d"
 
 # Environment variables
 [vars]
-GPU_SERVER_URL = "ws://YOUR_RUNPOD_IP:8765"
+GPU_SERVER_URL = "ws://213.173.107.138:29855"
 MAX_VIDEO_SIZE_MB = "500"

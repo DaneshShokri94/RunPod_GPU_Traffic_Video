@@ -266,6 +266,7 @@ export default function ROIDrawer({ backgroundFrame, frameWidth, frameHeight, on
           cursor: 'crosshair',
           display: 'block',
           border: '1px solid var(--border)',
+          background: '#1a1f2e',
         }}
       />
 

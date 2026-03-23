@@ -58,8 +58,17 @@ export default {
           videoKey,
           uploadId: mpu.uploadId,
           // Public URL the GPU server will use to download
-          videoUrl: `https://pub-YOUR_ACCOUNT.r2.dev/${videoKey}`,
+          videoUrl: `${new URL(request.url).origin}/api/upload/${videoKey}`,
         }, { headers: cors })
+      }
+
+      // ── PUT /api/upload/:key — receive video and store in R2 ──────────────
+      if (request.method === 'PUT' && path.startsWith('/api/upload/')) {
+        const key = path.replace('/api/upload/', '')
+        await env.VIDEO_BUCKET.put(key, request.body, {
+          httpMetadata: { contentType: request.headers.get('content-type') || 'video/mp4' }
+        })
+        return Response.json({ ok: true }, { headers: cors })
       }
 
       // ── POST /api/upload-complete ──────────────────────────────────────────
