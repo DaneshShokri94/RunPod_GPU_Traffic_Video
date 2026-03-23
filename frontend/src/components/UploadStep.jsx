@@ -60,9 +60,8 @@ export default function UploadStep({ onUploaded }) {
 
       setProgress(85)
 
-      // 3. get first frame from GPU server for ROI drawing
-      const wsUrl = `${WORKER_URL.replace('http', 'ws')}/api/job/${jobId}/connect`
-      const frame = await getFirstFrame(wsUrl, videoUrl)
+      // 3. extract first frame locally in the browser
+      const frame = await extractFirstFrame(file)
 
       setProgress(100)
       onUploaded({ jobId, videoKey, videoUrl }, frame.data, { w: frame.width, h: frame.height })
@@ -170,35 +169,35 @@ export default function UploadStep({ onUploaded }) {
   )
 }
 
-// helper: open WS, ask GPU for first frame, return base64
-function getFirstFrame(wsUrl, videoUrl) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(wsUrl)
-    const timer = setTimeout(() => {
-      ws.close()
-      // fallback: return a placeholder if GPU not reachable
-      resolve({ data: null, width: 1280, height: 720 })
-    }, 10000)
+// Extract first frame from video locally using a <video> element + canvas
+function extractFirstFrame(file) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video')
+    video.muted = true
+    video.preload = 'auto'
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'first_frame', video_url: videoUrl }))
+    video.onloadeddata = () => {
+      // seek to 0.1s to avoid potential black first frame
+      video.currentTime = 0.1
     }
-    ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data)
-      if (msg.type === 'first_frame') {
-        clearTimeout(timer)
-        ws.close()
-        resolve({ data: msg.frame, width: msg.width, height: msg.height })
-      }
-      if (msg.type === 'error') {
-        clearTimeout(timer)
-        ws.close()
-        resolve({ data: null, width: 1280, height: 720 })
-      }
+
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+      const base64 = dataUrl.split(',')[1]
+      URL.revokeObjectURL(video.src)
+      resolve({ data: base64, width: video.videoWidth, height: video.videoHeight })
     }
-    ws.onerror = () => {
-      clearTimeout(timer)
+
+    video.onerror = () => {
+      URL.revokeObjectURL(video.src)
       resolve({ data: null, width: 1280, height: 720 })
     }
+
+    video.src = URL.createObjectURL(file)
   })
 }
