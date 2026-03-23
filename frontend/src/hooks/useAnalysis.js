@@ -24,7 +24,7 @@ export default function useAnalysis(job, rois, lines) {
 
     try {
       // connect directly to GPU server WebSocket
-      const ws = new WebSocket('wss://cdqlh8iqpy0rdm-8765.proxy.runpod.net')
+      const ws = new WebSocket('wss://ukf8z3y7jpt9d4-8765.proxy.runpod.net')
       wsRef.current = ws
 
       ws.onopen = () => {
