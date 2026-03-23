@@ -16,7 +16,7 @@ export default function App() {
 
   const handleUploaded = (jobData, frame, size) => {
     setJob(jobData)
-    setFirstFrame(frame)
+    setFirstFrame(frame || null)
     setFrameSize(size)
     setStep(1)
   }
